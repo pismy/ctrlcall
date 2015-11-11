@@ -17,17 +17,38 @@ TEMPLATE = app
 HEADERS       = daemon.h \
     settingsdialog.h \
     settings.h \
-    utils.h \
-    phonenumber.h
+    phonenumberresult.h \
+    windowinfo.h
 
 SOURCES       = main.cpp \
     daemon.cpp \
     settingsdialog.cpp \
     settings.cpp \
-    utils.cpp \
-    phonenumber.cpp
+    phonenumberresult.cpp \
+    windowinfo.cpp
 
 RESOURCES     = systray.qrc
 
 FORMS += \
     settingsdialog.ui
+
+macx {
+    OBJECTIVE_SOURCES += mac.mm
+    HEADERS += mac.h
+    LIBS += -framework Cocoa
+}
+
+unix:!macx {
+    HEADERS += linux_x11.h
+    SOURCES += linux_x11.cpp
+    LIBS += -lX11
+#    CONFIG += link_pkgconfig
+#    PKGCONFIG += x11
+}
+
+win32 {
+    SOURCES += win.cpp
+    HEADERS += win.h
+    LIBS += -lpsapi
+}
+

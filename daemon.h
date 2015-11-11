@@ -7,6 +7,7 @@
 #include <QClipboard>
 #include <QDebug>
 #include "settings.h"
+#include "phonenumberresult.h"
 
 class QSystemTrayIcon;
 class QAction;
