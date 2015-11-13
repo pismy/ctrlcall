@@ -1,18 +1,7 @@
 #include "daemon.h"
 #include "settingsdialog.h"
 #include "phonenumberresult.h"
-#include "windowinfo.h"
-#ifdef Q_OS_WIN32
-#include "win.h"
-#endif
-
-#ifdef Q_OS_DARWIN
-#include "mac.h"
-#endif
-
-#ifdef Q_OS_LINUX
-#include "linux_x11.h"
-#endif
+#include "windowsutil.h"
 
 #include <QAction>
 #include <QMenu>
@@ -73,25 +62,8 @@ void Daemon::onClipboardChanged()
     if(res.error == PhoneNumberResult::NONE) {
         qDebug() << "looks like a phone number: " << res.result;
 
-    QList<WindowInfo> m_activeWindows;
-
-#ifdef Q_OS_WIN32
-    win w;
-    m_activeWindows = w.getActiveWindows();
-#endif
-
-#ifdef Q_OS_DARWIN
-    Mac m;
-    m_activeWindows = m.getActiveWindows();
-#endif
-
-#ifdef Q_OS_LINUX
-    linux_x11 l;
-    m_activeWindows = l.getActiveWindows();
-#endif
-    for(int i = 0; i < m_activeWindows.count(); i++)
-        qDebug() << "PID: " << m_activeWindows[i].getPID() << " Process Name: " << m_activeWindows[i].getProcessName() << " Window Title: " << m_activeWindows[i].getWindowTitle();
-
+        WindowsUtil::WinInfo* win = WindowsUtil::getActiveWindow();
+        qDebug() << "PID: " << win->processId << " Window Title: " << win->title << " App Name: " << win->appName;
     } else {
         qDebug() << "not a phone number: " << QApplication::clipboard()->text();
     }

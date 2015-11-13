@@ -18,7 +18,8 @@ HEADERS       = daemon.h \
     settingsdialog.h \
     settings.h \
     phonenumberresult.h \
-    windowinfo.h
+    windowinfo.h \
+    windowsutil.h
 
 SOURCES       = main.cpp \
     daemon.cpp \
@@ -33,22 +34,22 @@ FORMS += \
     settingsdialog.ui
 
 macx {
-    OBJECTIVE_SOURCES += mac.mm
+    OBJECTIVE_SOURCES += mac.mm windowsutil_mac.mm
     HEADERS += mac.h
     LIBS += -framework Cocoa
 }
 
 unix:!macx {
     HEADERS += linux_x11.h
-    SOURCES += linux_x11.cpp
+    SOURCES += linux_x11.cpp windowsutil_x11.cpp
     LIBS += -lX11
 #    CONFIG += link_pkgconfig
 #    PKGCONFIG += x11
 }
 
 win32 {
-    SOURCES += win.cpp
     HEADERS += win.h
+    SOURCES += win.cpp windowsutil_win.cpp
     LIBS += -lpsapi
 }
 

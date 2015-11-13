@@ -3,36 +3,229 @@
 
 /*
  * 0123456789
- *
+ * 06 30 07 29 35
+ * +33 6 30 07 29 35
+ * 33630072935
+ * 0033630072935
  */
-PhoneNumberResult PhoneNumberResult::parseToE164(const QString &numberToParse/*, const QString &countryCode = 0*/) {
-    QString e164;
-    for(int i=0; i<numberToParse.length(); i++) {
-        switch (numberToParse[i].toLatin1()) {
-        case '.':
-        case '-':
-        case '(':
-        case ')':
-        case ' ':
-            // ignore;
-            break;
-        case '0':
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-        case '7':
-        case '8':
-        case '9':
-            e164+=numberToParse[i];
-            break;
-        default:
-            return PhoneNumberResult(PhoneNumberResult::INVALID_CHAR, "Invalid char found at index "+QString::number(i)+": ["+numberToParse+"]");
+PhoneNumberResult PhoneNumberResult::parseToE164(const QString &numberToParse, const QString &defaultCC) {
+    /*
+     * Algorithme du parsing:
+     *  ----------------------
+     * On tente de dégager un
+     * premier groupe de chiffres du reste des chiffres: - ce groupe peut
+     * être entre parenthèses, - ou bien séparé du reste (espace, - ou .) -
+     * ce group peut être préfixé d'un '+' - tout autre caractère est
+     * interdit
+     *
+     * si(on est arrivé à dégager un premier groupe de chiffres) { si(un + a
+     * été lu ou que ce groupe était entre parenthèses) { alors il s'agit
+     * d'un numéro international et le premier groupe est le code pays }
+     * sinon si(le groupe commence par 0) { on considère que c'est un numéro
+     * national, et on utilise le code pays par défaut } sinon // le groupe
+     * ne commence pas par 0 { on considère que c'est un numéro
+     * international et le premier groupe est le code pays }
+     *
+     * On finit de lire le reste du numéro - on lit tous les chiffres, - on
+     * ignore les séparateurs (blanc, - ou .) - tout autre caractère est
+     * interdit } sinon // on ne peut dégager un premier groupe { si(le
+     * groupe commence par 0) { on considère que c'est un numéro national,
+     * et on utilise le code pays par défaut } sinon // le groupe ne
+     * commence pas par 0 { c'est un numéro au format E.164: on tente de
+     * séparer le code pays du numéro. } }
+     *
+     * On valide le code pays, ensuite on valide le numéro en fonction du
+     * pays (nombre de chiffres?), ensuite on valide éventuellement que
+     * c'est un numéro de mobile.
+     */
+    if (numberToParse == NULL || numberToParse.isEmpty()) {
+        return PhoneNumberResult(PhoneNumberResult::INVALID_NUMBER, "No phone number.");
+    }
+
+    int i = 0;
+    // --- 1: read international country code
+    QString countryCode = NULL;
+    QString number = NULL;
+    if (numberToParse[i] == '(') {
+        // --- international format. country code between braces:
+        /*
+         * ( + <code> ) <number> or ( <code> ) <number>
+         */
+        // consume '('
+        i++;
+        // skip blanks
+        while (i < numberToParse.length() && numberToParse[i] == ' ') {
+            i++;
+        }
+        // --- accept up to two '+' (optional)
+        if (i < numberToParse.length() && numberToParse[i] == '+') {
+            i++;
+            if (i < numberToParse.length() && numberToParse[i] == '+') {
+                i++;
+            }
+        }
+
+        // --- read digits untill ')'
+        QString buffer;
+        for (; i < numberToParse.length(); i++) {
+            if (numberToParse[i] == ')') {
+                // end of country code
+                break;
+            } else if (numberToParse[i] >= '0' && numberToParse[i] <= '9') {
+                // append digit to country code
+                buffer.append(numberToParse[i]);
+            } else if (numberToParse[i] == ' ') {
+                // ignore blanks
+                continue;
+            } else {
+                // invalid char
+                return PhoneNumberResult(PhoneNumberResult::INVALID_CHAR, "Unexpected char: " + QString(numberToParse[i]));
+            }
+        }
+        // treat eof
+        if (i >= numberToParse.length()) {
+            return PhoneNumberResult(PhoneNumberResult::INCOMPLETE_COUNTRY_CODE, "Incomplete: ')' expected.");
+        }
+        // --- consume ')'
+        i++;
+        countryCode = buffer;
+
+        // --- read the end of the number
+        buffer.clear();
+        for (; i < numberToParse.length(); i++) {
+            if (numberToParse[i] == ' ' || numberToParse[i] == '-' || numberToParse[i] == '.') {
+                // ignore separators
+                continue;
+            } else if (numberToParse[i] >= '0' && numberToParse[i] <= '9') {
+                // append
+                buffer.append(numberToParse[i]);
+            } else {
+                // invalid char
+                return PhoneNumberResult(PhoneNumberResult::INVALID_CHAR, "Unexpected char: " + QString(numberToParse[i]));
+            }
+        }
+        number = buffer;
+    } else if (numberToParse[i] == '0') {
+        // --- national format
+        // --- consume '0'
+        i++;
+        // --- country code is default
+        countryCode = defaultCC;
+
+        // --- read the end of the number
+        QString buffer;
+        for (; i < numberToParse.length(); i++) {
+            if (numberToParse[i] == ' ' || numberToParse[i] == '-' || numberToParse[i] == '.')
+                // ignore separators
+                continue;
+            else if (numberToParse[i] >= '0' && numberToParse[i] <= '9')
+                // append
+                buffer.append(numberToParse[i]);
+            else
+                // invalid char
+                return PhoneNumberResult(PhoneNumberResult::INVALID_CHAR, "Unexpected char: " + QString(numberToParse[i]));
+        }
+        number = buffer;
+    } else {
+        // --- international format. country code expected
+        /*
+         * + <code> {' ', '.', '-'} <number>
+         */
+        // --- accept up to two '+' (optional)
+        if (i < numberToParse.length() && numberToParse[i] == '+') {
+            i++;
+            if (i < numberToParse.length() && numberToParse[i] == '+') {
+                i++;
+            }
+        }
+        // skip blanks
+        while (i < numberToParse.length() && numberToParse[i] == ' ') {
+            i++;
+        }
+
+        // assume first block of digits is the country code
+        QString buffer;
+        for (; i < numberToParse.length(); i++) {
+            if (numberToParse[i] == ' ' || numberToParse[i] == '-' || numberToParse[i] == '.') {
+                // --- end of country code
+                break;
+            } else if (numberToParse[i] >= '0' && numberToParse[i] <= '9') {
+                // --- append
+                buffer.append(numberToParse[i]);
+            } else {
+                // --- invalid char
+                return PhoneNumberResult(PhoneNumberResult::INVALID_CHAR, "Unexpected char: " + QString(numberToParse[i]));
+            }
+        }
+        if (i >= numberToParse.length()) {
+            // --- no more char: that might have been a E.164 format
+            // try to split
+            QString e164Phone = buffer;
+            PhoneNumberResult res = parseCountryCode(countryCode);
+            if(res.error != PhoneNumberResult::NONE) {
+                return res;
+            }
+
+            int ccLen = res.result.length();
+            number = e164Phone.right(ccLen);
+//            countryCode = e164Phone.substring(0, ccLen);
+            countryCode = res.result;
+        } else {
+            // --- consume separator
+            i++;
+            countryCode = buffer;
+
+            buffer.clear();
+
+            // --- read the end of the number
+            for (; i < numberToParse.length(); i++) {
+                if (numberToParse[i] == ' ' || numberToParse[i] == '-' || numberToParse[i] == '.') {
+                    // ignore separators
+                    continue;
+                } else if (numberToParse[i] >= '0' && numberToParse[i] <= '9') {
+                    // append
+                    buffer.append(numberToParse[i]);
+                } else {
+                    // invalid char
+                    return PhoneNumberResult(PhoneNumberResult::INVALID_CHAR, "Unexpected char: " + QString(numberToParse[i]));
+                }
+            }
+
+            number = buffer;
         }
     }
-    return PhoneNumberResult(e164);
+
+    // --- vérification du code pays (lève une exception si invalide)
+    PhoneNumberResult res = parseCountryCode(countryCode);
+    if(res.error != PhoneNumberResult::NONE) {
+        return res;
+    }
+    if(res.result.length() != countryCode.length()) {
+        return PhoneNumberResult(PhoneNumberResult::INVALID_COUNTRY_CODE, "Invalid country code: "+countryCode);
+    }
+
+    // --- le numéro doit avoir au moins 3 chiffres
+    if (number.length() < 3) {
+        return PhoneNumberResult(PhoneNumberResult::INVALID_NUMBER, "Number should have at least 4 digits.");
+    }
+    // --- code pays + numéro doit avoir au max 15 chiffres
+    if (countryCode.length() + number.length() > 15) {
+        return PhoneNumberResult(PhoneNumberResult::INVALID_NUMBER, "Complete number should'nt have more than 15 digits.");
+    }
+    // --- validation du numéro en fonction du pays
+    int ccInt = countryCode.toInt();
+    switch (ccInt) {
+    case 33: // France
+        // --- le numéro ne peut commencer par '0'
+        if (number[0] == '0') {
+            return PhoneNumberResult(PhoneNumberResult::INVALID_NUMBER, "French numbers should not start with '0'.");
+        }
+        break;
+    }
+
+    // return "(+" + countryCode + ")" + (number.toString());
+    // return in E.164 format
+    return PhoneNumberResult(countryCode + number);
 }
 
 PhoneNumberResult PhoneNumberResult::parseCountryCode(const QString &iE164Number) {

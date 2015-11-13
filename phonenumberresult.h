@@ -8,6 +8,7 @@ class PhoneNumberResult
 public:
     enum Error {
         NONE,
+        INVALID_NUMBER,
         INCOMPLETE_COUNTRY_CODE,
         INVALID_CHAR,
         INVALID_COUNTRY_CODE
@@ -20,7 +21,7 @@ public:
     const QString errorMessage;
     const QString result;
 
-    static PhoneNumberResult parseToE164(const QString &numberToParse = 0/*, const QString &countryCode = 0*/);
+    static PhoneNumberResult parseToE164(const QString &numberToParse = 0, const QString &defaultCC = 0);
 //    static QString isValidCountryCode(const QString &countryCode);
     static PhoneNumberResult parseCountryCode(const QString &iE164Number);
 
